@@ -128,8 +128,16 @@ func Err(exit bool, err error) {
 	Errorf(exit, "%+v", err)
 }
 
+var doStackTrace = true
+
+func SetStackTracePrinting(enabled bool) {
+	doStackTrace = enabled
+}
+
 func Errorf(exit bool, format string, a ...any) {
-	debug.PrintStack()
+	if doStackTrace {
+		debug.PrintStack()
+	}
 	log(ERROR, format, a...)
 	if exit {
 		os.Exit(1)
@@ -137,7 +145,9 @@ func Errorf(exit bool, format string, a ...any) {
 }
 
 func Error(exit bool, a ...any) {
-	debug.PrintStack()
+	if doStackTrace {
+		debug.PrintStack()
+	}
 	log(ERROR, "%+v", a)
 	if exit {
 		os.Exit(1)

@@ -34,6 +34,7 @@ func main() {
     // Optional configurations
     log.SetMinLevel(log.DEBUG) // Set the minimum log level to DEBUG
     log.UseColor(false)        // Disable colored output (default is true)
+    log.SetStackTracePrinting(false) // Disable stack trace printing (default is true)
 
     // Logging a debug message
     log.Debug("This is a debug message")
@@ -98,6 +99,14 @@ Make your console pretty, or not:
 
 ```go
 log.UseColor(true) // or false if you're boring
+```
+
+### Enable/Disable Stack Trace Printing
+
+Control whether stack traces are printed for errors:
+
+```go
+log.SetStackTracePrinting(true) // or false if you don't want to see where you messed up
 ```
 
 ## License
