@@ -2,154 +2,225 @@ package dnutlogger
 
 import (
 	"fmt"
+	"io"
 	"os"
-	"runtime/debug"
-	"strings"
 	"time"
 )
 
 type LogLevel int
 
 const (
-	DEBUG LogLevel = iota
-	INFO
-	SUCCESS
-	WARN
-	ERROR
+	LevelDebug LogLevel = iota
+	LevelInfo
+	LevelSuccess
+	LevelWarning
+	LevelError
+	LevelFatal
 )
 
-var appliedLevel LogLevel = INFO
+var levelPrefix = [...]string{
+	LevelDebug:   "DBG",
+	LevelInfo:    "INF",
+	LevelSuccess: "SUC",
+	LevelWarning: "WAR",
+	LevelError:   "ERR",
+	LevelFatal:   "FTL",
+}
 
-func (l LogLevel) String() string {
+func (l LogLevel) Color() string {
 	switch l {
-	case DEBUG:
-		return "DBG"
-	case INFO:
-		return "INF"
-	case WARN:
-		return "WAR"
-	case SUCCESS:
-		return "SUC"
-	case ERROR:
-		return "ERR"
-	default:
-		return "UKN"
+	case LevelDebug:
+		return "\033[0;90m"
+	case LevelInfo:
+		return "\033[0;94m"
+	case LevelSuccess:
+		return "\033[0;92m"
+	case LevelWarning:
+		return "\033[0;93m"
+	case LevelError:
+		return "\033[0;91m"
+	case LevelFatal:
+		return "\033[0;31m"
 	}
+
+	return ""
 }
 
-var useColor = true
+const ColorReset = "\033[0m"
 
-func UseColor(enabled bool) {
-	useColor = enabled
+type FormattingOptions struct {
+	UseColor        bool
+	ShowTimestamp   bool
+	TimestampFormat string
 }
 
-func log(level LogLevel, format string, a ...any) {
-	if level < appliedLevel {
-		return
+type Logger struct {
+	level      LogLevel
+	writer     io.Writer
+	outputFunc func(level LogLevel, msg string)
+}
+
+func NewLogger(level LogLevel, writer io.Writer, opts FormattingOptions) *Logger {
+	logger := &Logger{
+		level:  level,
+		writer: writer,
 	}
-	var colorSet string
-	var colorReset string
-	if useColor {
-		colorReset = "\033[0m"
-		switch level {
-		case DEBUG:
-			colorSet = "\033[0;90m"
-		case INFO:
-			colorSet = "\033[0;94m"
-		case WARN:
-			colorSet = "\033[0;93m"
-		case SUCCESS:
-			colorSet = "\033[0;92m"
-		case ERROR:
-			colorSet = "\033[0;91m"
+
+	formatStr := ""
+	if opts.UseColor {
+		formatStr += level.Color()
+	}
+	formatStr += "%-3s "
+	if opts.ShowTimestamp {
+		formatStr += "[%s]"
+	}
+	if opts.UseColor {
+		formatStr += ColorReset
+	}
+	formatStr += " %s\n"
+
+	logger.outputFunc = func(level LogLevel, msg string) {
+		if opts.ShowTimestamp {
+			timestamp := time.Now().Format(opts.TimestampFormat)
+			fmt.Fprintf(writer, formatStr, levelPrefix[level], timestamp, msg)
+		} else {
+			fmt.Fprintf(writer, formatStr, levelPrefix[level], msg)
 		}
 	}
-	fmt.Printf("%s%-3s [%s]%s %s\n", colorSet, level, time.Now().Format("2006-01-02 15:04:05"), colorReset, fmt.Sprintf(format, a...))
+
+	return logger
 }
 
-func FromString(level string) LogLevel {
-	level = strings.ToUpper(level)
-	switch level {
-	case "DEBUG", "DBG":
-		return DEBUG
-	case "INFO", "INF":
-		return INFO
-	case "WARN", "WAR":
-		return WARN
-	case "SUCCESS", "SUC":
-		return SUCCESS
-	case "ERROR", "ERR":
-		return ERROR
-	default:
-		return INFO
-	}
+func (l *Logger) SetLevel(level LogLevel) {
+	l.level = level
 }
 
-func SetMinLevel(level LogLevel) {
-	appliedLevel = level
+func (l *Logger) SetWriter(writer io.Writer) {
+	l.writer = writer
 }
 
-func Debugf(format string, a ...any) {
-	log(DEBUG, format, a...)
-}
-
-func Debug(a ...any) {
-	log(DEBUG, "%+v", a)
-}
-
-func Infof(format string, a ...any) {
-	log(INFO, format, a...)
-}
-
-func Info(a ...any) {
-	log(INFO, "%+v", a)
-}
-
-func Warnf(format string, a ...any) {
-	log(WARN, format, a...)
-}
-
-func Warn(a ...any) {
-	log(WARN, "%+v", a)
-}
-
-func Successf(format string, a ...any) {
-	log(SUCCESS, format, a...)
-}
-
-func Success(a ...any) {
-	log(SUCCESS, "%+v", a)
-}
-
-func Err(exit bool, err error) {
-	if err == nil {
+func (l *Logger) log(level LogLevel, format string, v ...interface{}) {
+	if level < l.level {
 		return
 	}
-	Errorf(exit, "%+v", err)
+
+	message := fmt.Sprintf(format, v...)
+
+	l.outputFunc(level, message)
 }
 
-var doStackTrace = true
-
-func SetStackTracePrinting(enabled bool) {
-	doStackTrace = enabled
+func (l *Logger) Debug(v ...interface{}) {
+	l.log(LevelDebug, "%+v", v...)
 }
 
-func Errorf(exit bool, format string, a ...any) {
-	if doStackTrace {
-		debug.PrintStack()
-	}
-	log(ERROR, format, a...)
-	if exit {
-		os.Exit(1)
-	}
+func (l *Logger) Debugf(format string, v ...interface{}) {
+	l.log(LevelDebug, format, v...)
 }
 
-func Error(exit bool, a ...any) {
-	if doStackTrace {
-		debug.PrintStack()
-	}
-	log(ERROR, "%+v", a)
-	if exit {
-		os.Exit(1)
-	}
+func (l *Logger) Info(v ...interface{}) {
+	l.log(LevelInfo, "%+v", v...)
+}
+
+func (l *Logger) Infof(format string, v ...interface{}) {
+	l.log(LevelInfo, format, v...)
+}
+
+func (l *Logger) Success(v ...interface{}) {
+	l.log(LevelSuccess, "%+v", v...)
+}
+
+func (l *Logger) Successf(format string, v ...interface{}) {
+	l.log(LevelSuccess, format, v...)
+}
+
+func (l *Logger) Warning(v ...interface{}) {
+	l.log(LevelWarning, "%+v", v...)
+}
+
+func (l *Logger) Warningf(format string, v ...interface{}) {
+	l.log(LevelWarning, format, v...)
+}
+
+func (l *Logger) Error(v ...interface{}) {
+	l.log(LevelError, "%+v", v...)
+}
+
+func (l *Logger) Errorf(format string, v ...interface{}) {
+	l.log(LevelError, format, v...)
+}
+
+func (l *Logger) Fatal(v ...interface{}) {
+	l.log(LevelFatal, "%+v", v...)
+	os.Exit(1)
+}
+
+func (l *Logger) Fatalf(format string, v ...interface{}) {
+	l.log(LevelFatal, format, v...)
+	os.Exit(1)
+}
+
+var defaultLogger = NewLogger(LevelInfo, os.Stdout, FormattingOptions{
+	UseColor:        true,
+	ShowTimestamp:   true,
+	TimestampFormat: time.RFC822,
+})
+
+func SetLevel(level LogLevel) {
+	defaultLogger.SetLevel(level)
+}
+
+func SetWriter(writer io.Writer) {
+	defaultLogger.SetWriter(writer)
+}
+
+func Debug(v ...interface{}) {
+	defaultLogger.Debug(v...)
+}
+
+func Debugf(format string, v ...interface{}) {
+	defaultLogger.Debugf(format, v...)
+}
+
+func Info(v ...interface{}) {
+	defaultLogger.Info(v...)
+}
+
+func Infof(format string, v ...interface{}) {
+	defaultLogger.Infof(format, v...)
+}
+
+func Success(v ...interface{}) {
+	defaultLogger.Success(v...)
+}
+
+func Successf(format string, v ...interface{}) {
+	defaultLogger.Successf(format, v...)
+}
+
+func Warning(v ...interface{}) {
+	defaultLogger.Warning(v...)
+}
+
+func Warningf(format string, v ...interface{}) {
+	defaultLogger.Warningf(format, v...)
+}
+
+func Error(v ...interface{}) {
+	defaultLogger.Error(v...)
+}
+
+func Errorf(format string, v ...interface{}) {
+	defaultLogger.Errorf(format, v...)
+}
+
+func Fatal(v ...interface{}) {
+	defaultLogger.Fatal(v...)
+}
+
+func Fatalf(format string, v ...interface{}) {
+	defaultLogger.Fatalf(format, v...)
+}
+
+func SetDefaultLogger(logger *Logger) {
+	defaultLogger = logger
 }
