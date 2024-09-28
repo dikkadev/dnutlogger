@@ -66,20 +66,20 @@ func NewLogger(level LogLevel, writer io.Writer, opts FormattingOptions) *Logger
 		writer: writer,
 	}
 
-	formatStr := ""
-	if opts.UseColor {
-		formatStr += level.Color()
-	}
-	formatStr += "%-3s "
-	if opts.ShowTimestamp {
-		formatStr += "[%s]"
-	}
-	if opts.UseColor {
-		formatStr += ColorReset
-	}
-	formatStr += " %s\n"
-
 	logger.outputFunc = func(level LogLevel, msg string) {
+		formatStr := ""
+		if opts.UseColor {
+			formatStr += level.Color()
+		}
+		formatStr += "%-3s "
+		if opts.ShowTimestamp {
+			formatStr += "[%s]"
+		}
+		formatStr += " %s\n"
+		if opts.UseColor {
+			formatStr += ColorReset
+		}
+
 		if opts.ShowTimestamp {
 			timestamp := time.Now().Format(opts.TimestampFormat)
 			fmt.Fprintf(writer, formatStr, levelPrefix[level], timestamp, msg)
