@@ -1,3 +1,3 @@
-module github.com/sett17/dnutlogger
+module github.com/dikkadev/dnutlogger
 
 go 1.22.1
